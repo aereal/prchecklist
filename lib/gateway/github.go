@@ -291,6 +291,24 @@ func (g githubGateway) GetPullRequest(ctx context.Context, ref prchecklist.Check
 	return pullReq, contextWithRepoAccessRight(ctx, ref), nil
 }
 
+func (g githubGateway) SetRepositoryStatusAs(ctx context.Context, owner, repo, ref, state string) error {
+	gh, err := g.newGitHubClient(prchecklist.ContextClient(ctx))
+	if err != nil {
+		return err
+	}
+
+	contextName := "checklist_complete"
+	status := &github.RepoStatus{
+		State:   &state,
+		Context: &contextName,
+	}
+	if _, _, err = gh.Repositories.CreateStatus(ctx, owner, repo, ref, status); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (g githubGateway) GetRecentPullRequests(ctx context.Context) (map[string][]*prchecklist.PullRequest, error) {
 	var result githubRecentPullRequests
 	err := g.queryGraphQL(ctx, recentPullRequestsQuery, nil, &result)
@@ -396,6 +414,14 @@ func (g githubGateway) graphqlEndpoint() string {
 	}
 
 	return "https://" + g.domain + "/api/graphql"
+}
+
+func (g githubGateway) restEndpoint() string {
+	if g.domain == "github.com" {
+		return "https://api.github.com"
+	}
+
+	return "https://" + g.domain + "api/v3"
 }
 
 func (g githubGateway) queryGraphQL(ctx context.Context, query string, variables interface{}, value interface{}) error {
